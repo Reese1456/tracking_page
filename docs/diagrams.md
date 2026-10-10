@@ -30,7 +30,7 @@ sequenceDiagram
     participant DB as MongoDB Atlas
 
     U->>SPA: Enter waybill or open /track/:waybill
-    SPA->>SPA: Light format check, show loading state
+    SPA->>SPA: Advisory format check (same pattern as the API), show loading state
     SPA->>C: GET /api/tracking/{waybill}
     alt Invalid waybill format
         C-->>SPA: 400 ProblemDetails
@@ -167,7 +167,7 @@ classDiagram
     }
     namespace Tests {
         class InMemoryShipmentRepository {
-            -Dictionary~string, Shipment~ shipments
+            -shipments Dictionary
         }
     }
     TrackingController --> ITrackingService : uses
@@ -180,13 +180,13 @@ classDiagram
     TrackingResponse "1" *-- "1..*" TrackingEventDto
     IShipmentRepository <|.. MongoShipmentRepository
     IShipmentRepository <|.. InMemoryShipmentRepository
-    MongoShipmentRepository ..> ShipmentDocument : maps to and from Shipment
+    MongoShipmentRepository ..> ShipmentDocument : maps documents to Shipment
     Shipment "1" *-- "1..*" TrackingEvent : events
     Shipment "1" *-- "1" Receiver
     TrackingEvent --> TrackingStatus
     StatusStepMapper ..> TrackingStatus
     note for TrackingController "GET /api/tracking/{waybill} returns 200, 400 or 404\nGET /api/tracking returns the demo waybills"
-    note for InMemoryShipmentRepository "Lives in the test project"
+    note for InMemoryShipmentRepository "Lives in the test project\nshipments are keyed by waybill"
 ```
 
 Notation: `/` marks a derived value (computed, never stored), `1..*` means a shipment always has at least one event, and `Phone` and `StreetAddress` never leave the API because `ReceiverDto` doesn't include them.

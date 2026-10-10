@@ -26,6 +26,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | A dedicated Atlas user with `readWrite` on `deliverytracking` only | The repo is public; a leaked credential can't reach any other data |
 | Unique index on `waybill`, created at startup; waybills stored uppercase | The database enforces uniqueness, and lookups are case-insensitive without a collation |
 | `cancelledAt` instead of deleting shipments | Keeps an audit trail |
+| Waybills are never reused; the unique index covers cancelled shipments too | A waybill identifies one parcel forever. `--seed` upserts the six demo waybills, which also resets them |
+| The API only reads; domain-to-document mapping is used only to create seed documents | Fields the domain doesn't know about (`_id`, `createdAt`, `cancelledAt`) can't be overwritten by an update |
 | Separate document classes mapped to domain classes | Keeps MongoDB attributes out of the domain model |
 | Connection string from user-secrets locally and an environment variable in production | Never committed |
 
@@ -43,7 +45,7 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Decision | Why |
 |---|---|
 | xUnit with `WebApplicationFactory`; Vitest with React Testing Library | Unit and integration tests cover every functional test the brief lists |
-| Tests ship in the same pull request as the code they test | CI checks every change, not just the last one |
+| Tests ship in the same pull request as the code they test | Once the CI workflow is added (Part 2), it checks every change, not just the last one |
 | One hand-written in-memory repository in the test project, no mocking library | Tests never touch Atlas, and no test code ships in the API |
 | Render for both halves from one `render.yaml`, with the database on Atlas | One platform and one config file; the static site loads instantly while the free API wakes up |
 

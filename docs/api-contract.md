@@ -8,7 +8,9 @@ The React client and the C# API are both built against this document. If either 
 
 Returns the tracking details for one shipment. A waybill is `WB` followed by 8 ASCII digits (0–9), for example `WB10000004`.
 
-Input is forgiving: surrounding whitespace and lowercase are accepted. The controller rejects a badly formatted waybill with 400; otherwise the waybill is trimmed and uppercased before the lookup. The response's `waybill` field and the 404 `detail` always use the uppercase form.
+Input is forgiving: surrounding whitespace and lowercase are accepted. The input is trimmed and uppercased first, and the format check runs on that normalised value against `^WB[0-9]{8}$` (`[0-9]` rather than `\d`, because .NET's `\d` also matches non-ASCII digits). A value that fails gets 400; one that passes is looked up as-is. The response's `waybill` field and the 404 `detail` always use the uppercase form.
+
+The client may run the same check before sending a request, to give instant feedback. That check is advisory and must use this pattern; the API's 400 is the authority. A `/track/<anything>` URL opened directly skips the client check and still reaches the API's 400.
 
 **200 OK**
 
@@ -40,11 +42,13 @@ Every field is always present and non-null, except `exceptionReason`.
 | `status` | One of `Packed`, `Processing`, `InTransit`, `OutForDelivery`, `Delivered`, `Exception`. Sent as a string, not a number |
 | `stepIndex` | 0–4, the stepper step to highlight. `Delivered` and `Exception` both map to 4. The client uses this value and never calculates it |
 | `isException` | `true` only when `status` is `Exception` |
-| `exceptionReason` | Set only when `isException` is `true`, otherwise `null` |
+| `exceptionReason` | A non-empty string whenever `isException` is `true`, otherwise `null`. It comes from the newest event, so a later non-exception event clears it |
 | `receiver` | Name and city only. Phone numbers and street addresses are never returned |
 | `estimatedDelivery` | Date only, `yyyy-MM-dd`. Unchanged once the parcel is delivered or has an exception |
 | `lastUpdated` | The `timestamp` of the newest event |
 | `events` | Newest first, ordered by `timestamp` (not by the order they were recorded). Always at least one |
+
+**"Newest event"** means the event with the latest `timestamp`. If two events share a timestamp, the one recorded later (later in the stored `events` array) counts as newer. This rule decides `status`, `stepIndex`, `isException`, `exceptionReason` and `lastUpdated`, and it's the same in every repository implementation.
 
 **Timestamps** are ISO 8601 in UTC with an explicit offset, as .NET writes them: `2026-10-08T05:42:00+00:00`. That instant is 07:42 in Johannesburg (UTC+2). The client parses them as dates rather than comparing strings, and converts to Africa/Johannesburg time for display.
 
@@ -132,4 +136,6 @@ This is MongoDB Extended JSON: `$date` is a BSON Date (always UTC) and `$oid` is
 | Timestamps stored as BSON Dates in UTC, statuses as strings | Readable in Atlas, and avoids the driver storing `DateTimeOffset` as an array |
 | `cancelledAt` set instead of deleting documents | Keeps an audit trail; queries exclude cancelled shipments |
 | Separate `ShipmentDocument` classes, mapped to the domain `Shipment` in the repository | Keeps database attributes out of the domain classes |
+| The API only reads shipments. Mapping from domain to document is used only to create the seed documents | `_id`, `createdAt` and `cancelledAt` aren't part of the domain, so there's no update path that could overwrite them |
+| Waybills are never reused, so the unique index covers cancelled shipments too | A waybill identifies one parcel forever, as with real couriers |
 | Connection string from user-secrets locally and an environment variable in production | Never committed |

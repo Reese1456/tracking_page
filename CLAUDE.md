@@ -16,7 +16,8 @@ Decisions and reasons: DECISIONS.md.
 - Controller -> ITrackingService -> IShipmentRepository. Controllers only
   reject a badly formatted waybill (400) and map service results to status
   codes; all other logic lives in the service.
-- Current status is derived from the newest TrackingEvent. Never store it.
+- Current status is derived from the newest TrackingEvent (latest timestamp;
+  on a tie, the one recorded later). Never store it.
 - Step index mapping lives only in StatusStepMapper. The client never computes it.
 - Errors use ProblemDetails. 400 = bad waybill format, 404 = not found.
 - API responses never include receiver phone numbers or street addresses.
@@ -33,7 +34,8 @@ Decisions and reasons: DECISIONS.md.
 - The connection string comes from configuration (user-secrets locally,
   environment variable in production). Never commit it.
 - Tests use InMemoryShipmentRepository (in the test project) and never
-  touch Atlas.
+  touch Atlas. Integration tests replace IShipmentRepository, remove the
+  index-creation hosted service and use dummy mongodb://localhost settings.
 
 ## Code style
 - Prefer clear, conventional code over clever code.
