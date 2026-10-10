@@ -1,0 +1,28 @@
+# .NET build output and IDE files
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+
+# Node dependencies, build output and test coverage
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment files can hold secrets; only the example is committed
+.env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local-only: personal Claude Code settings and learning notes
+.claude/settings.local.json
+CLAUDE.local.md
+/learning/
