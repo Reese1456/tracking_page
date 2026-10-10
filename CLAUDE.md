@@ -13,7 +13,9 @@ Decisions and reasons: DECISIONS.md.
   React Testing Library
 
 ## Architecture rules
-- Controller -> ITrackingService -> IShipmentRepository. Controllers hold no logic.
+- Controller -> ITrackingService -> IShipmentRepository. Controllers only
+  reject a badly formatted waybill (400) and map service results to status
+  codes; all other logic lives in the service.
 - Current status is derived from the newest TrackingEvent. Never store it.
 - Step index mapping lives only in StatusStepMapper. The client never computes it.
 - Errors use ProblemDetails. 400 = bad waybill format, 404 = not found.

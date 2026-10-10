@@ -13,6 +13,9 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Current status derived from the newest tracking event, never stored | One source of truth that can't disagree with the event history, matching how couriers send scan events |
 | Step index mapped in the backend by `StatusStepMapper` | A pure function tested once; the client uses the value instead of re-implementing the rule |
 | Errors as `ProblemDetails`: 400 for a bad waybill format, 404 for an unknown waybill | A standard error shape the client can always read |
+| The controller rejects a bad waybill format; the waybill is trimmed and uppercased before lookup | Input stays forgiving (`wb10000004 ` works) while a malformed request still gets a clear 400 |
+| Timestamps returned in UTC as ISO 8601; the client converts to Johannesburg time | One unambiguous instant on the wire, local time only for display |
+| `GET /api/tracking` lists every active waybill | Fine while the database holds only demo data; a real system wouldn't expose it |
 | Receiver returned as name and city only | A public tracking page shouldn't expose phone numbers or addresses (POPIA) |
 
 ## Data
@@ -32,6 +35,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 |---|---|
 | Vite + React 18 + MUI v5 + Axios | MUI v5 is required by the brief and is built for React 18 |
 | Mock mode (`VITE_USE_MOCK=true`) serving local data that matches the contract | The client can be built and tested without the API running |
+| React Router with `/track/:waybill` | A tracking link can be shared and survives a refresh |
+| API base URL from `VITE_API_BASE_URL`; CORS allows only configured client origins | Client and API are on different origins; nothing else can call the API from a browser |
 
 ## Testing and delivery
 
@@ -50,5 +55,5 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | One branch, issue and pull request per part, merged with merge commits | Every change is reviewed and tested before `main`, and the history shows each step |
 | Conventional Commits with a body explaining why | The history explains itself |
 | AI assistance through Claude Code with committed rules (`CLAUDE.md`) | Anyone can see what the assistant was told |
-| Claude is denied `git commit`, `git push` and `gh pr merge` | Every commit and merge is made by a person who read the change |
+| Claude Code permission rules deny `git commit`, `git push` and `gh pr merge` | Every commit and merge is made by a person who read the change. The rules block the normal command forms; they're a policy, not a security boundary |
 | Hand-written `.gitignore` instead of the 400-line Visual Studio template | Every line can be explained |

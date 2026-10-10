@@ -92,8 +92,10 @@ classDiagram
             +StepIndex int
             +IsException bool
             +ExceptionReason string?
+            +Receiver ReceiverDto
             +EstimatedDelivery DateOnly
             +LastUpdated DateTimeOffset
+            +Events IReadOnlyList~TrackingEventDto~
         }
         class ReceiverDto {
             <<record>>
@@ -156,6 +158,9 @@ classDiagram
         class ShipmentDocument {
             +Id ObjectId
             +Waybill string
+            +Receiver ReceiverDocument
+            +EstimatedDelivery string
+            +Events List~TrackingEventDocument~
             +CancelledAt DateTime?
             +CreatedAt DateTime
         }
