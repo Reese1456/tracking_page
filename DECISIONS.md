@@ -39,15 +39,17 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Mock mode (`VITE_USE_MOCK=true`) serving local data that matches the contract | The client can be built and tested without the API running |
 | React Router with `/track/:waybill` | A tracking link can be shared and survives a refresh |
 | API base URL from `VITE_API_BASE_URL`; CORS allows only configured client origins | Client and API are on different origins; nothing else can call the API from a browser |
+| npm installs only package versions at least a week old (`min-release-age=7` in `client/.npmrc`) | Hijacked releases of popular packages are usually caught and pulled within days. `npm ci` still installs exactly what the lockfile pins |
 
 ## Testing and delivery
 
 | Decision | Why |
 |---|---|
 | xUnit with `WebApplicationFactory`; Vitest with React Testing Library | Unit and integration tests cover every functional test the brief lists |
-| Tests ship in the same pull request as the code they test | Once the CI workflow is added (Part 2), it checks every change, not just the last one |
+| Tests ship in the same pull request as the code they test | CI runs them on every pull request, so every change is checked, not just the last one |
 | One hand-written in-memory repository in the test project, no mocking library | Tests never touch Atlas, and no test code ships in the API |
 | Render for both halves from one `render.yaml`, with the database on Atlas | One platform and one config file; the static site loads instantly while the free API wakes up |
+| GitHub Actions builds and tests both halves on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge |
 
 ## Process
 
