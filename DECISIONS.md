@@ -39,7 +39,7 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | The API only reads; domain-to-document mapping is used only to create seed documents | Fields the domain doesn't know about (`_id`, `createdAt`, `cancelledAt`) can't be overwritten by an update |
 | Separate document classes mapped to domain classes | Keeps MongoDB attributes out of the domain model |
 | Connection string from user-secrets locally and an environment variable in production | Never committed |
-| Atlas network access allows any IP address (`0.0.0.0/0`) | Render's free services have no fixed outbound address of their own. The database is protected by the dedicated `readWrite`-only user and its password; a production system would use Render's published outbound IP ranges or private networking instead |
+| Atlas network access allows any IP address (`0.0.0.0/0`) | A convenience for a demo: the rule was already in place on this Atlas project. Render's outbound IP ranges for Frankfurt could be allowed instead, but every Render service in the region shares them, so they narrow access less than a dedicated address would. The database is protected by the dedicated `readWrite`-only user and its password; a production system would allow only those ranges or use private networking |
 | The local and deployed APIs share the `deliverytracking` database, seeded once from a developer machine | The demo data is identical everywhere, and nothing in the deploy writes to the database |
 
 ## Frontend
@@ -84,6 +84,7 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Page tests render the whole app at a URL | Each test also goes through the routes, the real hook and the mock client, like the backend's integration tests |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
 | `/health` pings MongoDB, with a 3-second timeout | Render stops routing to, then restarts, an instance whose health check fails, so a lost database shows as a down service rather than a stream of 500s. Render waits 5 seconds, so the check answers Unhealthy before Render gives up on it |
+| A failed health check logs the driver's exception; the `/health` response is only the word `Unhealthy` | The log is the only way to tell a wrong password from a network block on Render. It can name the cluster's hosts, which aren't credentials, and only the service owner can read it. The exception handler and the startup index check already log the same exceptions |
 | The API runs in Render's Frankfurt region | Render has no region in Africa, and Frankfurt is the closest one to the Atlas cluster in Cape Town |
 | Multi-stage Docker image on `aspnet:10.0`, running as the image's non-root user and binding to Render's `PORT` | The image holds only the published app, not the SDK or source. `exec` makes `dotnet` PID 1, so it receives Render's stop signal and shuts down cleanly |
 | The client's API URL and the API's allowed origin are entered in Render (`sync: false`), not committed | Neither URL exists until Render creates the services, and a typo can be fixed without a commit. The connection string is entered the same way |
