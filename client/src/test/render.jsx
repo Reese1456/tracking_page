@@ -15,13 +15,13 @@ export function renderWithProviders(ui, { route = '/' } = {}) {
 }
 
 // jsdom has no layout engine, so it has no window.matchMedia at all. This
-// fake answers min-width and max-width queries as a screen of `width` pixels
-// would, which is all MUI's useMediaQuery asks.
+// fake answers min-width queries, the only kind theme.breakpoints.up() makes,
+// as a screen of `width` pixels would. The screen never resizes during a test.
 export function setScreenWidth(width) {
   vi.stubGlobal(
     'matchMedia',
     vi.fn((query) => ({
-      matches: matchesWidth(query, width),
+      matches: width >= minWidth(query),
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -33,8 +33,12 @@ export function setScreenWidth(width) {
   )
 }
 
-function matchesWidth(query, width) {
-  const min = query.match(/min-width:\s*([\d.]+)px/)
-  const max = query.match(/max-width:\s*([\d.]+)px/)
-  return (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]))
+// Fails loudly on any other query, so a new kind of media query in the app
+// can't be silently answered wrong.
+function minWidth(query) {
+  const match = query.match(/^\(min-width:\s*([\d.]+)px\)$/)
+  if (!match) {
+    throw new Error(`setScreenWidth can't answer the media query ${query}`)
+  }
+  return Number(match[1])
 }

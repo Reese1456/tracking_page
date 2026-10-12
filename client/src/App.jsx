@@ -20,7 +20,8 @@ function App() {
             to="/"
             variant="h6"
             color="inherit"
-            sx={{ textDecoration: 'none' }}
+            // The theme's 44px rule covers buttons and chips, not links.
+            sx={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
           >
             Delivery Tracking
           </Typography>

@@ -35,7 +35,7 @@ export default function WaybillSearch({ initialValue = '', showDemoWaybills = tr
 
   return (
     <Stack spacing={2}>
-      <Box component="form" onSubmit={handleSubmit} noValidate>
+      <Box component="form" role="search" onSubmit={handleSubmit} noValidate>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'flex-start' }}>
           <TextField
             label="Waybill number"

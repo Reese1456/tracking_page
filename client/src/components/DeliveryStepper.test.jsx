@@ -40,6 +40,29 @@ describe('DeliveryStepper', () => {
     expect(stepStates(steps)).toEqual(expectedStates)
   })
 
+  // The status says In Transit but the API says step 1. The stepper must
+  // follow the API, because the step mapping lives only in the backend.
+  it("follows the API's stepIndex even when it disagrees with the status", () => {
+    const steps = renderStepper({ ...shipmentWithStatus('InTransit'), stepIndex: 1 })
+
+    expect(steps[1]).toHaveAttribute('aria-current', 'step')
+    expect(stepStates(steps)).toEqual(['Completed', 'Current step', 'Pending', 'Pending', 'Pending'])
+  })
+
+  it('draws completed steps as green checks, the current step in blue and pending steps in grey', () => {
+    const steps = renderStepper(shipmentWithStatus('InTransit'))
+    const icon = (index) => within(steps[index]).getByRole('img')
+
+    expect(icon(0)).toHaveAttribute('data-testid', 'CheckCircleIcon')
+    expect(icon(0)).toHaveStyle({ color: theme.palette.success.main })
+    expect(icon(2)).toHaveAttribute('data-testid', 'LocalShippingIcon')
+    expect(icon(2)).toHaveStyle({ color: theme.palette.primary.main })
+    expect(icon(3)).toHaveAttribute('data-testid', 'DeliveryDiningIcon')
+    expect(icon(3)).toHaveStyle({ color: theme.palette.pending.main })
+    expect(within(steps[2]).getByText('In Transit')).toHaveStyle({ fontWeight: 500 })
+    expect(within(steps[3]).getByText('Out for Delivery')).not.toHaveStyle({ fontWeight: 500 })
+  })
+
   it('shows every step as completed for Delivered', () => {
     const steps = renderStepper(shipmentWithStatus('Delivered'))
 
@@ -80,5 +103,17 @@ describe('DeliveryStepper', () => {
     renderStepper(shipmentWithStatus('InTransit'))
 
     expect(screen.getByRole('list')).toHaveClass('MuiStepper-horizontal')
+  })
+
+  // md starts at exactly 900px.
+  it.each([
+    [899, 'MuiStepper-vertical'],
+    [900, 'MuiStepper-horizontal'],
+  ])('at %ipx renders with %s', (width, orientationClass) => {
+    setScreenWidth(width)
+
+    renderStepper(shipmentWithStatus('InTransit'))
+
+    expect(screen.getByRole('list')).toHaveClass(orientationClass)
   })
 })

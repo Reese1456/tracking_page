@@ -77,7 +77,13 @@ function ShipmentDetails({ shipment }) {
         // Collapsed by default on phones so the stepper and history come
         // first; the summary line keeps the delivery date in view.
         <Accordion variant="outlined" disableGutters>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          {/* MUI names the panel's region from these ids, so a screen
+              reader announces which section opened. */}
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            id="shipment-details-header"
+            aria-controls="shipment-details-content"
+          >
             <div>
               <Typography fontWeight={500}>Shipment details</Typography>
               <Typography variant="body2" color="text.secondary">

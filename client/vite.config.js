@@ -15,6 +15,10 @@ export default defineConfig({
     // central Europe in summer is UTC+2, the same as Johannesburg, which
     // would hide that mistake.
     env: { VITE_USE_MOCK: 'true', VITE_API_BASE_URL: 'http://api.test', TZ: 'America/Denver' },
+    // Each test file runs in its own child process, which picks up TZ when it
+    // starts. Worker threads share the parent's time zone and would ignore it.
+    // This is Vitest's default; it's stated because the TZ setting needs it.
+    pool: 'forks',
     // Each test starts with empty call history on every spy, and with any
     // variable or global a test changed through vi.stubEnv or vi.stubGlobal
     // put back.
