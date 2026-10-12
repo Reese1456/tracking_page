@@ -205,15 +205,32 @@ describe('TrackingPage', () => {
     expect(screen.getByText('T. Mokoena')).toBeInTheDocument()
   })
 
-  it("shows the API's title and detail for a server error, with a retry button", async () => {
+  // A 5xx might succeed next time; any other 4xx would fail the same way.
+  it.each([
+    [500, true],
+    [503, true],
+    [409, false],
+    [429, false],
+  ])("shows the API's title and detail for a %i, with a retry button: %s", async (status, offersRetry) => {
     vi.mocked(getTracking).mockRejectedValueOnce(
-      responseError(503, { title: 'Service Unavailable', status: 503, detail: 'The database is not answering.' }),
+      responseError(status, { title: 'Problem title', status, detail: 'Problem detail.' }),
     )
     renderAt('/track/WB10000004')
     await finishRequests()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Service UnavailableThe database is not answering.')
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Problem titleProblem detail.')
+    expect(screen.queryAllByRole('button', { name: 'Try again' })).toHaveLength(offersRetry ? 1 : 0)
+  })
+
+  // React can't render an object, so trusting these fields would crash the page.
+  it('falls back to the generic text when title and detail are not strings', async () => {
+    vi.mocked(getTracking).mockRejectedValueOnce(
+      responseError(500, { title: { text: 'Problem title' }, status: 500, detail: { text: 'Problem detail.' } }),
+    )
+    renderAt('/track/WB10000004')
+    await finishRequests()
+
+    expect(screen.getByRole('alert')).toHaveTextContent("Something went wrongWe couldn't load this shipment just now.")
   })
 
   // Render's proxy answers with an HTML page if the API can't be reached.
