@@ -50,6 +50,11 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | API base URL from `VITE_API_BASE_URL`; CORS allows only configured client origins | Client and API are on different origins; nothing else can call the API from a browser |
 | npm installs only package versions at least a week old (`min-release-age=7` in `client/.npmrc`) | Hijacked releases of popular packages are usually caught and pulled within days. `npm ci` still installs exactly what the lockfile pins. Needs npm 11.10 or newer; older npm warns and ignores the setting |
 | `react-is` held at React 18's version by an npm override | MUI 5.18 asks for react-is 19, which doesn't recognise React 18 elements, so MUI's development warnings would never fire. MUI's installation guide prescribes this override for React 18 |
+| The mock answers a bad or unknown waybill with the same Axios error and ProblemDetails body as the API (400 and 404) | The hook and components handle one error shape, so mock mode can't hide a bug in error handling |
+| `useTracking` aborts its request with `AbortController` when the waybill changes or the page unmounts, and ignores any answer once its request is aborted | No work continues for a page that's gone, and a late answer for an old waybill, even one that arrived just before the abort, can't replace the current result |
+| `useTracking` gives every request a new id (each waybill change and each retry) and derives `'loading'` from whether the stored result has the current id | The previous shipment never shows under a new waybill, even for one render or when returning to an earlier waybill, and no state is set synchronously inside an effect |
+| Axios timeout of 30 seconds | A hung request becomes an error with a retry, and the wait is long enough for the free API to wake up |
+| Body text 16–20px on phones and 14–18px from `md` up; pending steps in `grey[600]` | Larger text where the page is read on a phone, switching at the same width as the stepper; `grey[600]` is the lightest MUI grey with 4.5:1 text contrast on white |
 
 ## Testing and delivery
 
@@ -59,7 +64,9 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Tests ship in the same pull request as the code they test | CI runs them on every pull request, so every change is checked, not just the last one |
 | One hand-written in-memory repository in the test project, no mocking library | Tests never touch Atlas, and no test code ships in the API |
 | Render for both halves from one `render.yaml`, with the database on Atlas | One platform and one config file; the static site loads instantly while the free API wakes up |
-| GitHub Actions builds and tests the server, and lints and builds the client, on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge. Client tests join when Vitest is added |
+| GitHub Actions builds and tests the server, and lints, tests and builds the client, on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge |
+| Client tests run with mock mode forced on in the Vitest config, and the API client is spied on rather than replaced | No test touches the network, even with a local `.env.local`, and the hook still goes through the real mock client and its Axios errors |
+| Real-mode client tests swap the exported Axios instance's adapter; tests use fake timers for the mock's 400 ms delay | The URL, base URL, timeout and response handling are checked without a network, and no test races a real clock on a slow CI machine |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
 
 ## Process
