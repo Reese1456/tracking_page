@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace DeliveryTracking.Api.Validation;
@@ -14,7 +15,7 @@ public static partial class WaybillFormat
         return input.Trim().ToUpperInvariant();
     }
 
-    public static bool IsValid(string? input) =>
+    public static bool IsValid([NotNullWhen(true)] string? input) =>
         input is not null && WaybillPattern().IsMatch(Normalize(input));
 
     // [0-9] rather than \d, because .NET's \d also matches non-ASCII digits

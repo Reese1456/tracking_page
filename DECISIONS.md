@@ -21,6 +21,9 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Domain-to-response mapping written by hand in one method, no AutoMapper | Nine fields don't need a library, and leaving out the phone and address is visible in the code instead of hidden in a mapping profile |
 | Events sorted newest first by timestamp, then by recorded order | Matches the tie-break rule, so the first event in the list is always the one that decided the status |
 | The service converts every timestamp to UTC | The contract promises `+00:00` whichever repository supplied the shipment; the in-memory one keeps the seed data's `+02:00` |
+| OpenAPI document from .NET's built-in generator, shown with Swagger UI, in every environment | Microsoft's current approach, with the UI reviewers already know; it's on in production because the deployed API is a demo to try |
+| Status code pages turn bodiless errors into ProblemDetails | An unknown route or a 405 returns the same error shape as the API's own 400 and 404, so the client has one shape to read |
+| CORS policy allows only `GET` from the configured origins | The API has no other methods, so allowing more would only widen what a browser can send |
 
 ## Data
 
