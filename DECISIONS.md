@@ -46,7 +46,7 @@ One line per decision and the reason for it. Newest decisions are added at the b
 |---|---|
 | Vite + React 18 + MUI v5 + Axios | MUI v5 is required by the brief and is built for React 18 |
 | Mock mode (`VITE_USE_MOCK=true`) serving local data that matches the contract | The client can be built and tested without the API running |
-| React Router with `/track/:waybill` | A tracking link can be shared and survives a refresh |
+| React Router 7 with `/track/:waybill`, in declarative mode | A tracking link can be shared and survives a refresh. Version 8 needs React 19, and `useTracking` already loads the data, so route loaders aren't needed |
 | API base URL from `VITE_API_BASE_URL`; CORS allows only configured client origins | Client and API are on different origins; nothing else can call the API from a browser |
 | npm installs only package versions at least a week old (`min-release-age=7` in `client/.npmrc`) | Hijacked releases of popular packages are usually caught and pulled within days. `npm ci` still installs exactly what the lockfile pins. Needs npm 11.10 or newer; older npm warns and ignores the setting |
 | `react-is` held at React 18's version by an npm override | MUI 5.18 asks for react-is 19, which doesn't recognise React 18 elements, so MUI's development warnings would never fire. MUI's installation guide prescribes this override for React 18 |
@@ -55,6 +55,13 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | `useTracking` gives every request a new id (each waybill change and each retry) and derives `'loading'` from whether the stored result has the current id | The previous shipment never shows under a new waybill, even for one render or when returning to an earlier waybill, and no state is set synchronously inside an effect |
 | Axios timeout of 30 seconds | A hung request becomes an error with a retry, and the wait is long enough for the free API to wake up |
 | Body text 16–20px on phones and 14–18px from `md` up; pending steps in `grey[600]` | Larger text where the page is read on a phone, switching at the same width as the stepper; `grey[600]` is the lightest MUI grey with 4.5:1 text contrast on white |
+| The search box checks the waybill format before navigating; a URL typed by hand goes straight to the API | A typo gets instant feedback without a round trip, while the server stays the authority on what's valid |
+| Each step's state is exposed as `aria-current` and an icon with an accessible name, on `role="list"` items | Screen readers hear "Completed" or "Current step", not just a colour, and tests find steps the way a user does. Not `<ol>`, because MUI renders connectors between the steps |
+| Icons imported by name from the `@mui/icons-material` package root, not one file per icon | The per-icon files are CommonJS, which Vite 8 hands a `"type": "module"` app as an object rather than a component, and the page renders blank. The root is the ES module build and still tree-shakes |
+| Buttons and chips are at least 44px high below `md`, set once in the theme | The minimum comfortable touch target, applied to every button and chip, including later ones |
+| Dates formatted with `Intl.DateTimeFormat('en-ZA')`: timestamps in `Africa/Johannesburg`, the date-only delivery estimate in UTC | No date library needed, a South African parcel shows South African times to every viewer, and a date-only value can't slip to the previous day west of London |
+| On phones the summary and receiver cards sit in an accordion that starts collapsed, with the delivery date in its header | The stepper and history come first on a small screen, and the most wanted detail stays visible |
+| An unknown waybill shows an info message; any other failure shows an error with "Try again" | A typo isn't a failure and retrying it can't help; a timeout or server error might succeed the second time |
 
 ## Testing and delivery
 
@@ -67,6 +74,10 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | GitHub Actions builds and tests the server, and lints, tests and builds the client, on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge |
 | Client tests run with mock mode forced on in the Vitest config, and the API client is spied on rather than replaced | No test touches the network, even with a local `.env.local`, and the hook still goes through the real mock client and its Axios errors |
 | Real-mode client tests swap the exported Axios instance's adapter; tests use fake timers for the mock's 400 ms delay | The URL, base URL, timeout and response handling are checked without a network, and no test races a real clock on a slow CI machine |
+| Component tests render with the app's theme and a `MemoryRouter`, fake `matchMedia` by screen width, and check colours with computed styles | Colour checks compare against the app's real palette and fail if the red disappears, not only if a class name changes. Orientation is the one check that uses MUI's documented class names, because it has no accessible signal |
+| Client tests run in the `America/Denver` time zone, in separate processes (`pool: 'forks'`) | A date formatter that loses its time zone fails on every machine. In UTC (CI) or UTC+2 (central Europe in summer, the same as Johannesburg), that mistake can look correct. Worker threads would ignore `TZ`, so the pool is stated |
+| Layout and touch-target sizes are checked in a real browser, not in jsdom | jsdom has no layout and ignores `@media` rules, so a jsdom test of "44px on phones" or "two columns on desktop" would prove nothing |
+| Page tests render the whole app at a URL | Each test also goes through the routes, the real hook and the mock client, like the backend's integration tests |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
 
 ## Process

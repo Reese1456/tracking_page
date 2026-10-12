@@ -25,4 +25,14 @@ export const theme = createTheme(baseTheme, {
     body1: { fontSize: '1.125rem', [breakpoints.up('md')]: { fontSize: '1rem' } },
     body2: { fontSize: '1rem', [breakpoints.up('md')]: { fontSize: '0.875rem' } },
   },
+  // 44px is the smallest touch target WCAG 2.5.5 and Apple recommend. Only
+  // below md, where the page is used with a finger rather than a mouse.
+  components: {
+    MuiButton: {
+      styleOverrides: { root: { [breakpoints.down('md')]: { minHeight: 44 } } },
+    },
+    MuiChip: {
+      styleOverrides: { root: { [breakpoints.down('md')]: { minHeight: 44 } } },
+    },
+  },
 })
