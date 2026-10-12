@@ -1,11 +1,8 @@
 import axios, { AxiosError, AxiosHeaders, CanceledError } from 'axios'
+import { normalizeWaybill, WAYBILL_PATTERN } from '../constants/waybill.js'
 import { shipments } from '../mocks/trackingData.js'
 
 const MOCK_DELAY_MS = 400
-
-// The pattern from docs/api-contract.md. Only the mock uses it here; with the
-// real API, the server decides.
-const WAYBILL_PATTERN = /^WB[0-9]{8}$/
 
 const PROBLEM_TYPES = {
   400: 'https://tools.ietf.org/html/rfc9110#section-15.5.1',
@@ -46,7 +43,7 @@ export async function getDemoWaybills(signal) {
 async function mockGetTracking(waybill, url, signal) {
   await mockDelay(signal)
 
-  const normalized = waybill.trim().toUpperCase()
+  const normalized = normalizeWaybill(waybill)
   if (!WAYBILL_PATTERN.test(normalized)) {
     throw problem(url, 400, 'Invalid waybill format', 'A waybill is WB followed by 8 digits, for example WB10000004.')
   }
