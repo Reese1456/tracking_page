@@ -1,9 +1,15 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import DeliveryDiningIcon from '@mui/icons-material/DeliveryDining'
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
-import Inventory2Icon from '@mui/icons-material/Inventory2'
-import LocalShippingIcon from '@mui/icons-material/LocalShipping'
-import SettingsIcon from '@mui/icons-material/Settings'
+// Icons come from the package root, which is its ES module build. The
+// per-icon paths (@mui/icons-material/CheckCircle) are CommonJS, and Vite 8
+// hands this "type": "module" app their whole exports object instead of the
+// component, so the page renders blank.
+import {
+  CheckCircle as CheckCircleIcon,
+  DeliveryDining as DeliveryDiningIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  Inventory2 as Inventory2Icon,
+  LocalShipping as LocalShippingIcon,
+  Settings as SettingsIcon,
+} from '@mui/icons-material'
 
 // Positions match the API's stepIndex (0-4). The client highlights the step
 // the API names and never works the index out from the status.

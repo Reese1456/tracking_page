@@ -1,4 +1,4 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import { CheckCircle as CheckCircleIcon } from '@mui/icons-material'
 import Step from '@mui/material/Step'
 import StepConnector from '@mui/material/StepConnector'
 import StepLabel from '@mui/material/StepLabel'

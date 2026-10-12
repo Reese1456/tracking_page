@@ -1,4 +1,4 @@
-import LocalShippingIcon from '@mui/icons-material/LocalShipping'
+import { LocalShipping as LocalShippingIcon } from '@mui/icons-material'
 import AppBar from '@mui/material/AppBar'
 import Container from '@mui/material/Container'
 import Toolbar from '@mui/material/Toolbar'
