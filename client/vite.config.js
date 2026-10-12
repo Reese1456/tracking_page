@@ -8,7 +8,13 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
     // Tests never touch the network, whatever a developer's .env.local says.
     // The base URL is a placeholder that real-mode tests check is used.
-    env: { VITE_USE_MOCK: 'true', VITE_API_BASE_URL: 'http://api.test' },
+    //
+    // TZ is a zone behind UTC and unlike South Africa's, so a date formatter
+    // that forgets its timeZone option and follows the computer's clock shows
+    // the wrong time or day and fails. Left to the machine, CI runs in UTC and
+    // central Europe in summer is UTC+2, the same as Johannesburg, which
+    // would hide that mistake.
+    env: { VITE_USE_MOCK: 'true', VITE_API_BASE_URL: 'http://api.test', TZ: 'America/Denver' },
     // Each test starts with empty call history on every spy, and with any
     // variable or global a test changed through vi.stubEnv or vi.stubGlobal
     // put back.

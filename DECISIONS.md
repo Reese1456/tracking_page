@@ -57,7 +57,11 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Body text 16–20px on phones and 14–18px from `md` up; pending steps in `grey[600]` | Larger text where the page is read on a phone, switching at the same width as the stepper; `grey[600]` is the lightest MUI grey with 4.5:1 text contrast on white |
 | The search box checks the waybill format before navigating; a URL typed by hand goes straight to the API | A typo gets instant feedback without a round trip, while the server stays the authority on what's valid |
 | Each step's state is exposed as `aria-current` and an icon with an accessible name, on `role="list"` items | Screen readers hear "Completed" or "Current step", not just a colour, and tests find steps the way a user does. Not `<ol>`, because MUI renders connectors between the steps |
+| Icons imported by name from the `@mui/icons-material` package root, not one file per icon | The per-icon files are CommonJS, which Vite 8 hands a `"type": "module"` app as an object rather than a component, and the page renders blank. The root is the ES module build and still tree-shakes |
 | Buttons and chips are at least 44px high below `md`, set once in the theme | The minimum comfortable touch target, applied to every button and chip, including later ones |
+| Dates formatted with `Intl.DateTimeFormat('en-ZA')`: timestamps in `Africa/Johannesburg`, the date-only delivery estimate in UTC | No date library needed, a South African parcel shows South African times to every viewer, and a date-only value can't slip to the previous day west of London |
+| On phones the summary and receiver cards sit in an accordion that starts collapsed, with the delivery date in its header | The stepper and history come first on a small screen, and the most wanted detail stays visible |
+| An unknown waybill shows an info message; any other failure shows an error with "Try again" | A typo isn't a failure and retrying it can't help; a timeout or server error might succeed the second time |
 
 ## Testing and delivery
 
@@ -71,6 +75,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Client tests run with mock mode forced on in the Vitest config, and the API client is spied on rather than replaced | No test touches the network, even with a local `.env.local`, and the hook still goes through the real mock client and its Axios errors |
 | Real-mode client tests swap the exported Axios instance's adapter; tests use fake timers for the mock's 400 ms delay | The URL, base URL, timeout and response handling are checked without a network, and no test races a real clock on a slow CI machine |
 | Component tests render with the app's theme and a `MemoryRouter`, fake `matchMedia` by screen width, and check colours with computed styles | Colour checks compare against the app's real palette and fail if the red disappears, not only if a class name changes. Orientation is the one check that uses MUI's documented class names, because it has no accessible signal |
+| Client tests run in the `America/Denver` time zone | A date formatter that loses its time zone fails on every machine. In UTC (CI) or UTC+2 (central Europe in summer, the same as Johannesburg), that mistake can look correct |
+| Page tests render the whole app at a URL | Each test also goes through the routes, the real hook and the mock client, like the backend's integration tests |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
 
 ## Process
