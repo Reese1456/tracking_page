@@ -64,7 +64,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Tests ship in the same pull request as the code they test | CI runs them on every pull request, so every change is checked, not just the last one |
 | One hand-written in-memory repository in the test project, no mocking library | Tests never touch Atlas, and no test code ships in the API |
 | Render for both halves from one `render.yaml`, with the database on Atlas | One platform and one config file; the static site loads instantly while the free API wakes up |
-| GitHub Actions builds and tests the server, and lints and builds the client, on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge. Client tests join when Vitest is added |
+| GitHub Actions builds and tests the server, and lints, tests and builds the client, on every pull request and every push to `main` | Problems show up on the pull request, on a clean Linux machine, before the merge |
+| Client tests run with mock mode forced on in the Vitest config, and the API client is spied on rather than replaced | No test touches the network, even with a local `.env.local`, and the hook still goes through the real mock client and its Axios errors |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
 
 ## Process
