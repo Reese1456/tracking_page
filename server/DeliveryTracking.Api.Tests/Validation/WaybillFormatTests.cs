@@ -8,6 +8,8 @@ public class WaybillFormatTests
     [InlineData("WB10000004")]
     [InlineData("wb10000004")]
     [InlineData("  WB10000004 ")]
+    [InlineData("WB10000004\n")]
+    [InlineData("WB10000004\r\n")]
     public void IsValid_AcceptedInput_ReturnsTrue(string input)
     {
         var result = WaybillFormat.IsValid(input);
@@ -21,9 +23,11 @@ public class WaybillFormatTests
     [InlineData("XB10000004")]
     [InlineData("10000004")]
     [InlineData("WB 10000004")]
+    [InlineData("WB1000\n0004")]
+    [InlineData("WB10000004x")]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("WB1000000٤")]
+    [InlineData("WB1000000\u0664")]
     public void IsValid_InvalidInput_ReturnsFalse(string input)
     {
         var result = WaybillFormat.IsValid(input);

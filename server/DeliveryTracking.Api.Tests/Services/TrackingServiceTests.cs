@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using DeliveryTracking.Api.Contracts;
 using DeliveryTracking.Api.Data;
 using DeliveryTracking.Api.Domain;
 using DeliveryTracking.Api.Services;
@@ -13,7 +14,7 @@ public class TrackingServiceTests
     private static readonly DateTimeOffset Start = new(2026, 10, 6, 8, 0, 0, TimeSpan.Zero);
 
     // No "+" in the phone number: the default JSON encoder escapes "+" as
-    // +, which would let the privacy test pass even if the phone leaked.
+    // \u002B, which would let the privacy test pass even if the phone leaked.
     private const string Phone = "082 555 0199";
     private const string StreetAddress = "1 Example Street, Parktown";
 
@@ -77,9 +78,37 @@ public class TrackingServiceTests
 
         Assert.NotNull(result);
         Assert.Equal(
-            [TrackingStatus.OutForDelivery, TrackingStatus.InTransit, TrackingStatus.Packed],
-            result.Events.Select(e => e.Status));
+            [
+                new TrackingEventDto(TrackingStatus.OutForDelivery, "Out for delivery", "Midrand Depot", Start.AddHours(30)),
+                new TrackingEventDto(TrackingStatus.InTransit, "In transit", "Johannesburg Hub", Start.AddHours(10)),
+                new TrackingEventDto(TrackingStatus.Packed, "Parcel packed", "Cape Town Warehouse", Start),
+            ],
+            result.Events);
         Assert.Equal(TrackingStatus.OutForDelivery, result.Status);
+    }
+
+    [Fact]
+    public async Task GetTrackingAsync_EventsWithMixedOffsets_SortsByInstantNotWallClock()
+    {
+        // 08:00+02:00 is 06:00 UTC, so it is older than 06:30+00:00 even though
+        // its clock time is later. 08:30+02:00 is the same instant as 06:30 UTC
+        // and was recorded later, so it wins the tie.
+        var service = CreateService(CreateShipment(
+            Packed(new DateTimeOffset(2026, 10, 8, 8, 0, 0, TimeSpan.FromHours(2))),
+            new TrackingEvent(
+                TrackingStatus.InTransit, "Departed hub", "Cape Town Hub", new DateTimeOffset(2026, 10, 8, 6, 30, 0, TimeSpan.Zero)),
+            new TrackingEvent(
+                TrackingStatus.InTransit, "Arrived at regional hub", "Johannesburg Hub",
+                new DateTimeOffset(2026, 10, 8, 8, 30, 0, TimeSpan.FromHours(2)))));
+
+        var result = await service.GetTrackingAsync(Waybill, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(
+            ["Arrived at regional hub", "Departed hub", "Parcel packed"],
+            result.Events.Select(e => e.Description));
+        Assert.Equal(TrackingStatus.InTransit, result.Status);
+        Assert.Equal(result.LastUpdated, result.Events[0].Timestamp);
     }
 
     [Fact]
@@ -175,7 +204,7 @@ public class TrackingServiceTests
     }
 
     [Fact]
-    public async Task GetDemoWaybillsAsync_ReturnsSortedWaybills()
+    public async Task GetDemoWaybillsAsync_ShipmentsInReverseOrder_ReturnsSortedWaybills()
     {
         var service = CreateService(SeedData.CreateShipments().Reverse());
 
