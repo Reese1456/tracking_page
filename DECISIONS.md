@@ -50,6 +50,11 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | API base URL from `VITE_API_BASE_URL`; CORS allows only configured client origins | Client and API are on different origins; nothing else can call the API from a browser |
 | npm installs only package versions at least a week old (`min-release-age=7` in `client/.npmrc`) | Hijacked releases of popular packages are usually caught and pulled within days. `npm ci` still installs exactly what the lockfile pins. Needs npm 11.10 or newer; older npm warns and ignores the setting |
 | `react-is` held at React 18's version by an npm override | MUI 5.18 asks for react-is 19, which doesn't recognise React 18 elements, so MUI's development warnings would never fire. MUI's installation guide prescribes this override for React 18 |
+| The mock answers a bad or unknown waybill with the same Axios error and ProblemDetails body as the API (400 and 404) | The hook and components handle one error shape, so mock mode can't hide a bug in error handling |
+| `useTracking` aborts its request with `AbortController` when the waybill changes or the page unmounts | A slow answer for an old waybill can't replace the new one, and no work continues for a page that's gone |
+| `useTracking` derives `'loading'` from whether the stored result belongs to the current request | The previous shipment never shows under a new waybill, even for one render, and no state is set synchronously inside the effect |
+| Axios timeout of 30 seconds | A hung request becomes an error with a retry, and the wait is long enough for the free API to wake up |
+| Body text 16–20px on phones and 14–18px from `md` up; pending steps in `grey[600]` | Larger text where the page is read on a phone, switching at the same width as the stepper; `grey[600]` is the lightest MUI grey with 4.5:1 text contrast on white |
 
 ## Testing and delivery
 
