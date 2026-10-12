@@ -22,7 +22,7 @@ import { formatDate } from '../utils/format.js'
 
 export default function TrackingPage() {
   const { waybill } = useParams()
-  const { state, data, retry } = useTracking(waybill)
+  const { state, data, error, retry } = useTracking(waybill)
 
   return (
     <Stack spacing={3}>
@@ -31,28 +31,45 @@ export default function TrackingPage() {
       <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere' }}>
         Waybill {waybill}
       </Typography>
-      {state === 'loading' && <TrackingSkeleton waybill={waybill} />}
+      {/* Prefixed because sibling keys must differ from the search box's. */}
+      {state === 'loading' && <TrackingSkeleton key={`loading-${waybill}`} waybill={waybill} />}
       {state === 'notFound' && (
         <Alert severity="info">
           <AlertTitle>We couldn&apos;t find that shipment</AlertTitle>
           No shipment matches {waybill}. Check the waybill number on your shipping confirmation and try again.
         </Alert>
       )}
-      {state === 'error' && (
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" onClick={retry}>
-              Try again
-            </Button>
-          }
-        >
-          <AlertTitle>Something went wrong</AlertTitle>
-          We couldn&apos;t load this shipment just now.
-        </Alert>
-      )}
+      {state === 'error' && <TrackingError error={error} onRetry={retry} />}
       {state === 'success' && <ShipmentDetails shipment={data} />}
     </Stack>
+  )
+}
+
+function TrackingError({ error, onRetry }) {
+  const status = error.response?.status
+  // A 4xx answer would be the same next time. Retrying only helps when the
+  // request never got an answer or the server had a problem.
+  const canRetry = status === undefined || status >= 500
+  // Only a ProblemDetails body has string title and detail fields; a proxy's
+  // HTML error page or an empty body falls back to the generic text.
+  const problem = error.response?.data
+  const title = typeof problem?.title === 'string' ? problem.title : 'Something went wrong'
+  const detail = typeof problem?.detail === 'string' ? problem.detail : "We couldn't load this shipment just now."
+
+  return (
+    <Alert
+      severity="error"
+      action={
+        canRetry && (
+          <Button color="inherit" onClick={onRetry}>
+            Try again
+          </Button>
+        )
+      }
+    >
+      <AlertTitle>{title}</AlertTitle>
+      {detail}
+    </Alert>
   )
 }
 

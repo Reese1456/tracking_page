@@ -3,6 +3,10 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react()],
+  // The API's CORS policy allows exactly http://localhost:5173. If the port
+  // is busy, failing to start is clearer than moving to 5174 and having every
+  // request blocked by CORS.
+  server: { port: 5173, strictPort: true },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',

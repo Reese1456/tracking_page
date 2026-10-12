@@ -1,0 +1,10 @@
+# Local build output would overwrite the container's own restore and build.
+**/bin/
+**/obj/
+
+# Not part of the image.
+DeliveryTracking.Api.Tests/
+**/*.user
+.vs/
+Dockerfile
+.dockerignore

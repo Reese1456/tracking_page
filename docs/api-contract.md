@@ -74,7 +74,7 @@ Every field is always present and non-null, except `exceptionReason`.
 }
 ```
 
-**Other failures**: an unhandled server error returns 500 as ProblemDetails with a generic title and no internal details (no stack trace). The client treats a 500, any other unexpected status, a timeout or a network failure as an error and offers a retry.
+**Other failures**: an unhandled server error returns 500 as ProblemDetails with a generic title and no internal details (no stack trace). The client treats any other status, a timeout or a network failure as an error and shows the ProblemDetails `title` and `detail` when the body has them. It offers a retry only for a 5xx, a timeout or a network failure; any other 4xx would fail the same way again.
 
 All errors use the standard `ProblemDetails` shape (RFC 9457) with content type `application/problem+json`, so the client can always read `title` and `detail`.
 

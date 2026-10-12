@@ -6,6 +6,8 @@ namespace DeliveryTracking.Api.Data.Mongo;
 public static class MongoServiceCollectionExtensions
 {
     public const string ShipmentsCollectionName = "shipments";
+    public const string HealthCheckName = "mongodb";
+    public static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(3);
 
     public static IServiceCollection AddMongo(this IServiceCollection services)
     {
@@ -32,6 +34,11 @@ public static class MongoServiceCollectionExtensions
         services.AddSingleton<IShipmentRepository, MongoShipmentRepository>();
         services.AddSingleton<ShipmentSeeder>();
         services.AddHostedService<ShipmentIndexInitializer>();
+
+        // Render gives a health check 5 seconds. Without a shorter timeout, a
+        // ping to an unreachable cluster waits out the driver's 30-second
+        // server selection, and Render sees a timeout instead of Unhealthy.
+        services.AddHealthChecks().AddCheck<MongoHealthCheck>(HealthCheckName, timeout: HealthCheckTimeout);
 
         return services;
     }

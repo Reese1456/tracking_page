@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.jsx'
 import { getTracking } from '../api/trackingClient.js'
+import { shipments } from '../mocks/trackingData.js'
 import { renderWithProviders, setScreenWidth } from '../test/render.jsx'
 import { theme } from '../theme.js'
 
@@ -19,6 +20,18 @@ function renderAt(route) {
 
 function finishRequests() {
   return act(() => vi.advanceTimersByTimeAsync(400))
+}
+
+function wait(ms) {
+  return act(() => vi.advanceTimersByTimeAsync(ms))
+}
+
+// The error Axios throws when the server answers with this status and body.
+function responseError(status, data) {
+  return new AxiosError(`Request failed with status code ${status}`, AxiosError.ERR_BAD_RESPONSE, undefined, undefined, {
+    status,
+    data,
+  })
 }
 
 // The browser's Back button, which changes the URL without touching the page.
@@ -49,6 +62,40 @@ describe('TrackingPage', () => {
     expect(screen.getByRole('heading', { name: 'Shipment' })).toBeInTheDocument()
     expect(screen.getByText('T. Mokoena')).toBeInTheDocument()
     expect(screen.getByText('Johannesburg')).toBeInTheDocument()
+  })
+
+  it('says the server is waking up once a lookup takes 3 seconds, then shows the shipment', async () => {
+    let answer
+    vi.mocked(getTracking).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    renderAt('/track/WB10000004')
+
+    await wait(2999)
+    expect(screen.getByRole('status')).not.toHaveTextContent('waking up')
+    await wait(1)
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Looking up WB10000004… The server has been asleep and is waking up. This can take up to a minute.',
+    )
+
+    await act(async () => answer(structuredClone(shipments.find((s) => s.waybill === 'WB10000004'))))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByText('T. Mokoena')).toBeInTheDocument()
+  })
+
+  it('starts the 3-second wait again for a newly searched waybill', async () => {
+    vi.mocked(getTracking)
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockReturnValueOnce(new Promise(() => {}))
+    renderAt('/track/WB10000004')
+    await wait(2000)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Waybill number' }), { target: { value: 'WB10000005' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Track' }))
+    await wait(2000)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Looking up WB10000005…')
+    expect(screen.getByRole('status')).not.toHaveTextContent('waking up')
+    await wait(1000)
+    expect(screen.getByRole('status')).toHaveTextContent('waking up')
   })
 
   it('shows dates in South African time', async () => {
@@ -149,13 +196,51 @@ describe('TrackingPage', () => {
     renderAt('/track/WB10000004')
     await finishRequests()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong')
+    expect(screen.getByRole('alert')).toHaveTextContent("Something went wrongWe couldn't load this shipment just now.")
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect(screen.getByRole('status')).toBeInTheDocument()
     await finishRequests()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByText('T. Mokoena')).toBeInTheDocument()
+  })
+
+  // A 5xx might succeed next time; any other 4xx would fail the same way.
+  it.each([
+    [500, true],
+    [503, true],
+    [409, false],
+    [429, false],
+  ])("shows the API's title and detail for a %i, with a retry button: %s", async (status, offersRetry) => {
+    vi.mocked(getTracking).mockRejectedValueOnce(
+      responseError(status, { title: 'Problem title', status, detail: 'Problem detail.' }),
+    )
+    renderAt('/track/WB10000004')
+    await finishRequests()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Problem titleProblem detail.')
+    expect(screen.queryAllByRole('button', { name: 'Try again' })).toHaveLength(offersRetry ? 1 : 0)
+  })
+
+  // React can't render an object, so trusting these fields would crash the page.
+  it('falls back to the generic text when title and detail are not strings', async () => {
+    vi.mocked(getTracking).mockRejectedValueOnce(
+      responseError(500, { title: { text: 'Problem title' }, status: 500, detail: { text: 'Problem detail.' } }),
+    )
+    renderAt('/track/WB10000004')
+    await finishRequests()
+
+    expect(screen.getByRole('alert')).toHaveTextContent("Something went wrongWe couldn't load this shipment just now.")
+  })
+
+  // Render's proxy answers with an HTML page if the API can't be reached.
+  it('falls back to the generic message when the error body is not ProblemDetails', async () => {
+    vi.mocked(getTracking).mockRejectedValueOnce(responseError(502, '<html><body>Bad Gateway</body></html>'))
+    renderAt('/track/WB10000004')
+    await finishRequests()
+
+    expect(screen.getByRole('alert')).toHaveTextContent("Something went wrongWe couldn't load this shipment just now.")
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 
   it('loads the new shipment when another waybill is searched, and the old one on Back', async () => {
@@ -206,12 +291,16 @@ describe('TrackingPage', () => {
     expect(screen.getByText('T. Mokoena')).toBeInTheDocument()
   })
 
-  it('shows the error state for a URL the API rejects as badly formatted', async () => {
+  // Asking again would get the same 400, so there's nothing to retry.
+  it("shows the API's 400 message for a badly formatted URL, without a retry button", async () => {
     renderAt('/track/hello')
     await finishRequests()
 
     expect(getTracking).toHaveBeenCalledWith('hello', expect.any(AbortSignal))
-    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Invalid waybill formatA waybill is WB followed by 8 digits, for example WB10000004.',
+    )
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 
   it('sends an unknown path back to the search page', () => {
