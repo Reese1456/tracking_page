@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
 namespace DeliveryTracking.Api.Tests.Integration;
@@ -217,12 +218,26 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
     }
 
     [Fact]
-    public async Task GetHealth_AppRunning_ReturnsHealthy()
+    public async Task GetHealth_DatabaseAnswering_ReturnsHealthy()
     {
         var response = await _client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
+    }
+
+    // Render reads anything but a 2xx or 3xx as a failed health check.
+    [Fact]
+    public async Task GetHealth_DatabaseNotAnswering_Returns503Unhealthy()
+    {
+        var client = _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            TrackingApiFactory.ReplaceMongoHealthCheck(services, HealthCheckResult.Unhealthy("MongoDB did not answer a ping."))))
+            .CreateClient();
+
+        var response = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("Unhealthy", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
