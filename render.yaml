@@ -1,0 +1,44 @@
+# Render Blueprint: creates both services from this repo.
+# Values marked sync: false are secrets or URLs that Render asks for when
+# the Blueprint is first created; they are never stored here.
+services:
+  - type: web
+    name: delivery-tracking-api
+    runtime: docker
+    rootDir: server
+    # Relative to rootDir.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    # The closest Render region to the Atlas cluster in Cape Town.
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: Mongo__ConnectionString
+        sync: false
+      - key: Mongo__DatabaseName
+        value: deliverytracking
+      # The static site's URL, for example https://delivery-tracking-web.onrender.com
+      - key: Cors__AllowedOrigins__0
+        sync: false
+
+  - type: web
+    name: delivery-tracking-web
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    # Every path serves index.html, so React Router can handle /track/...
+    # on a refresh. Real files such as /assets/*.js are served first.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Built into the JavaScript, so changing it needs a new deploy.
+      - key: VITE_API_BASE_URL
+        sync: false
+      # The same major version as CI, so a change to Render's default
+      # can't change the build.
+      - key: NODE_VERSION
+        value: "24"

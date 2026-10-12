@@ -39,6 +39,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | The API only reads; domain-to-document mapping is used only to create seed documents | Fields the domain doesn't know about (`_id`, `createdAt`, `cancelledAt`) can't be overwritten by an update |
 | Separate document classes mapped to domain classes | Keeps MongoDB attributes out of the domain model |
 | Connection string from user-secrets locally and an environment variable in production | Never committed |
+| Atlas network access allows any IP address (`0.0.0.0/0`) | Render's free services have no fixed outbound address of their own. The database is protected by the dedicated `readWrite`-only user and its password; a production system would use Render's published outbound IP ranges or private networking instead |
+| The local and deployed APIs share the `deliverytracking` database, seeded once from a developer machine | The demo data is identical everywhere, and nothing in the deploy writes to the database |
 
 ## Frontend
 
@@ -53,7 +55,7 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | The mock answers a bad or unknown waybill with the same Axios error and ProblemDetails body as the API (400 and 404) | The hook and components handle one error shape, so mock mode can't hide a bug in error handling |
 | `useTracking` aborts its request with `AbortController` when the waybill changes or the page unmounts, and ignores any answer once its request is aborted | No work continues for a page that's gone, and a late answer for an old waybill, even one that arrived just before the abort, can't replace the current result |
 | `useTracking` gives every request a new id (each waybill change and each retry) and derives `'loading'` from whether the stored result has the current id | The previous shipment never shows under a new waybill, even for one render or when returning to an earlier waybill, and no state is set synchronously inside an effect |
-| Axios timeout of 30 seconds | A hung request becomes an error with a retry, and the wait is long enough for the free API to wake up |
+| Axios timeout of 90 seconds | Render's free API can take about a minute to wake, so a shorter timeout would fail just before the answer arrives. A server that never answers still ends in an error with a retry |
 | Body text 16–20px on phones and 14–18px from `md` up; pending steps in `grey[600]` | Larger text where the page is read on a phone, switching at the same width as the stepper; `grey[600]` is the lightest MUI grey with 4.5:1 text contrast on white |
 | The search box checks the waybill format before navigating; a URL typed by hand goes straight to the API | A typo gets instant feedback without a round trip, while the server stays the authority on what's valid |
 | Each step's state is exposed as `aria-current` and an icon with an accessible name, on `role="list"` items | Screen readers hear "Completed" or "Current step", not just a colour, and tests find steps the way a user does. Not `<ol>`, because MUI renders connectors between the steps |
@@ -61,7 +63,9 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Buttons and chips are at least 44px high below `md`, set once in the theme | The minimum comfortable touch target, applied to every button and chip, including later ones |
 | Dates formatted with `Intl.DateTimeFormat('en-ZA')`: timestamps in `Africa/Johannesburg`, the date-only delivery estimate in UTC | No date library needed, a South African parcel shows South African times to every viewer, and a date-only value can't slip to the previous day west of London |
 | On phones the summary and receiver cards sit in an accordion that starts collapsed, with the delivery date in its header | The stepper and history come first on a small screen, and the most wanted detail stays visible |
-| An unknown waybill shows an info message; any other failure shows an error with "Try again" | A typo isn't a failure and retrying it can't help; a timeout or server error might succeed the second time |
+| An unknown waybill shows an info message; any other failure shows the API's ProblemDetails `title` and `detail`, with "Try again" only when there was no answer or a 5xx | A typo isn't a failure, and the API owns the wording of its errors. A 400 would fail the same way again; a timeout or server error might succeed the second time |
+| After 3 seconds of loading, the status line says the server is waking up | A warm lookup takes well under a second, so a longer wait almost always means the free API is starting, and the page shouldn't look broken meanwhile |
+| The Vite dev server must run on port 5173 (`strictPort`) | CORS allows exactly that origin in development. Moving to another port when 5173 is busy would turn into CORS errors that never mention the port |
 
 ## Testing and delivery
 
@@ -79,6 +83,11 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Layout and touch-target sizes are checked in a real browser, not in jsdom | jsdom has no layout and ignores `@media` rules, so a jsdom test of "44px on phones" or "two columns on desktop" would prove nothing |
 | Page tests render the whole app at a URL | Each test also goes through the routes, the real hook and the mock client, like the backend's integration tests |
 | The API serves plain HTTP; HTTPS ends at Render's proxy | The public URL is still HTTPS, and the container needs no certificate or redirect of its own |
+| `/health` pings MongoDB, with a 3-second timeout | Render stops routing to, then restarts, an instance whose health check fails, so a lost database shows as a down service rather than a stream of 500s. Render waits 5 seconds, so the check answers Unhealthy before Render gives up on it |
+| The API runs in Render's Frankfurt region | Render has no region in Africa, and Frankfurt is the closest one to the Atlas cluster in Cape Town |
+| Multi-stage Docker image on `aspnet:10.0`, running as the image's non-root user and binding to Render's `PORT` | The image holds only the published app, not the SDK or source. `exec` makes `dotnet` PID 1, so it receives Render's stop signal and shuts down cleanly |
+| The client's API URL and the API's allowed origin are entered in Render (`sync: false`), not committed | Neither URL exists until Render creates the services, and a typo can be fixed without a commit. The connection string is entered the same way |
+| The client pins Node 24 with `NODE_VERSION` on Render | The same major version as CI, so a change to Render's default can't change the build |
 
 ## Process
 
