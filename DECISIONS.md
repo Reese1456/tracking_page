@@ -27,6 +27,8 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Unique index on `waybill`, created at startup; waybills stored uppercase | The database enforces uniqueness, and lookups are case-insensitive without a collation |
 | `cancelledAt` instead of deleting shipments | Keeps an audit trail |
 | Waybills are never reused; the unique index covers cancelled shipments too | A waybill identifies one parcel forever. `--seed` upserts the six demo waybills, which also resets them |
+| `--seed` writes demo content with `$set` and `_id`/`createdAt` with `$setOnInsert` | Re-running restores edited or cancelled demo shipments, but never changes their identity or creation time, and an unchanged run modifies nothing |
+| Mongo settings validated when the app starts | A missing connection string stops startup with a message that says how to set it, instead of failing on the first request |
 | The API only reads; domain-to-document mapping is used only to create seed documents | Fields the domain doesn't know about (`_id`, `createdAt`, `cancelledAt`) can't be overwritten by an update |
 | Separate document classes mapped to domain classes | Keeps MongoDB attributes out of the domain model |
 | Connection string from user-secrets locally and an environment variable in production | Never committed |

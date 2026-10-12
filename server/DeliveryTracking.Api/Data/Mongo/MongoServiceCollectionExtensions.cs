@@ -28,6 +28,11 @@ public static class MongoServiceCollectionExtensions
                 .GetCollection<ShipmentDocument>(ShipmentsCollectionName);
         });
 
+        // Singleton is safe because its only state is the thread-safe collection.
+        services.AddSingleton<IShipmentRepository, MongoShipmentRepository>();
+        services.AddSingleton<ShipmentSeeder>();
+        services.AddHostedService<ShipmentIndexInitializer>();
+
         return services;
     }
 }
