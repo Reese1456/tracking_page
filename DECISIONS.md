@@ -17,6 +17,10 @@ One line per decision and the reason for it. Newest decisions are added at the b
 | Timestamps returned in UTC as ISO 8601; the client converts to Johannesburg time | One unambiguous instant on the wire, local time only for display |
 | `GET /api/tracking` lists every active waybill | Fine while the database holds only demo data; a real system wouldn't expose it |
 | Receiver returned as name and city only | A public tracking page shouldn't expose phone numbers or addresses (POPIA) |
+| The tracking service returns `null` for an unknown waybill instead of throwing | Not found is an expected answer, not a failure; the controller turns it into a 404, and the service stays free of HTTP |
+| Domain-to-response mapping written by hand in one method, no AutoMapper | Nine fields don't need a library, and leaving out the phone and address is visible in the code instead of hidden in a mapping profile |
+| Events sorted newest first by timestamp, then by recorded order | Matches the tie-break rule, so the first event in the list is always the one that decided the status |
+| The service converts every timestamp to UTC | The contract promises `+00:00` whichever repository supplied the shipment; the in-memory one keeps the seed data's `+02:00` |
 
 ## Data
 
