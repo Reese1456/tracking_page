@@ -9,12 +9,12 @@ const PROBLEM_TYPES = {
   404: 'https://tools.ietf.org/html/rfc9110#section-15.5.5',
 }
 
-// Exported so tests can swap in a network-free adapter. A cold API on
-// Render's free tier can take this long to wake up; Part 9 adds a message
-// for the wait.
+// Exported so tests can swap in a network-free adapter. The free API on
+// Render sleeps when idle and can take about a minute to wake, so the timeout
+// leaves room for that rather than failing just before the answer arrives.
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 30_000,
+  timeout: 90_000,
 })
 
 // Read on each call rather than once at load, so tests can switch modes.

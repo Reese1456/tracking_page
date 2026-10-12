@@ -34,7 +34,7 @@ describe('trackingClient against the real API', () => {
       method: 'get',
       baseURL: 'http://api.test',
       url: '/api/tracking/WB%2F1%20%3F',
-      timeout: 30_000,
+      timeout: 90_000,
       signal,
     })
   })
