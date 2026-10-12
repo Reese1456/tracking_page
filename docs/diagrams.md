@@ -61,8 +61,8 @@ sequenceDiagram
 classDiagram
     namespace Api {
         class TrackingController {
-            +GetTracking(string waybill, CancellationToken ct) Task~IActionResult~
-            +GetDemoWaybills(CancellationToken ct) Task~IActionResult~
+            +GetTracking(string? waybill, CancellationToken ct) Task~ActionResult~TrackingResponse~~
+            +GetDemoWaybills(CancellationToken ct) Task~ActionResult~IReadOnlyList~string~~~
         }
     }
     namespace Application {
@@ -72,7 +72,7 @@ classDiagram
             +GetDemoWaybillsAsync(CancellationToken ct) Task~IReadOnlyList~string~~
         }
         class TrackingService {
-            -IShipmentRepository repository
+            -IShipmentRepository shipments
             -ToResponse(Shipment shipment) TrackingResponse
         }
         class IShipmentRepository {
@@ -82,7 +82,7 @@ classDiagram
         }
         class WaybillFormat {
             <<static>>
-            +IsValid(string input) bool
+            +IsValid(string? input) bool
             +Normalize(string input) string
         }
         class TrackingResponse {
