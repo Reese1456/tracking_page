@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
 import { getTracking } from '../api/trackingClient.js'
 
@@ -8,41 +7,51 @@ import { getTracking } from '../api/trackingClient.js'
  * request has no result yet.
  */
 export function useTracking(waybill) {
-  const [attempt, setAttempt] = useState(0)
+  // Every request gets a new id, including a return to an earlier waybill,
+  // so a result can only ever match the request that produced it.
+  const [request, setRequest] = useState({ waybill, id: 0 })
   const [result, setResult] = useState(null)
 
-  // Each result is tagged with the request it answers. When the waybill
-  // changes or retry is called, the key changes and the old result stops
-  // counting straight away, so the previous shipment is never shown under the
-  // new waybill, even for one render.
-  const requestKey = `${waybill}#${attempt}`
+  // Updating state during render, rather than in an effect, is React's way to
+  // respond to a changed prop: React re-renders straight away, before
+  // anything reaches the screen, so the old result is never shown under the
+  // new waybill.
+  if (request.waybill !== waybill) {
+    setRequest({ waybill, id: request.id + 1 })
+  }
 
   useEffect(() => {
-    if (!waybill) {
+    if (!request.waybill) {
       return
     }
 
     const controller = new AbortController()
 
-    getTracking(waybill, controller.signal)
-      .then((data) => setResult({ key: requestKey, state: 'success', data, error: null }))
-      .catch((error) => {
-        if (axios.isCancel(error)) {
-          return
+    // Once aborted, this request has been replaced or its component is gone.
+    // Checking here, not just relying on the abort, also covers an answer
+    // that had already arrived before the abort happened.
+    getTracking(request.waybill, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setResult({ id: request.id, state: 'success', data, error: null })
         }
-        const state = error.response?.status === 404 ? 'notFound' : 'error'
-        setResult({ key: requestKey, state, data: null, error })
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          const state = error.response?.status === 404 ? 'notFound' : 'error'
+          setResult({ id: request.id, state, data: null, error })
+        }
       })
 
     return () => controller.abort()
-  }, [waybill, requestKey])
+  }, [request])
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), [])
+  const retry = useCallback(() => setRequest((current) => ({ ...current, id: current.id + 1 })), [])
 
   if (!waybill) {
     return { state: 'idle', data: null, error: null, retry }
   }
-  if (result?.key !== requestKey) {
+  if (result?.id !== request.id) {
     return { state: 'loading', data: null, error: null, retry }
   }
   return { state: result.state, data: result.data, error: result.error, retry }

@@ -1,7 +1,6 @@
-import axios, { AxiosError, CanceledError } from 'axios'
+import axios, { AxiosError, AxiosHeaders, CanceledError } from 'axios'
 import { shipments } from '../mocks/trackingData.js'
 
-const useMock = import.meta.env.VITE_USE_MOCK === 'true'
 const MOCK_DELAY_MS = 400
 
 // The pattern from docs/api-contract.md. Only the mock uses it here; with the
@@ -13,23 +12,30 @@ const PROBLEM_TYPES = {
   404: 'https://tools.ietf.org/html/rfc9110#section-15.5.5',
 }
 
-// A cold API on Render's free tier can take this long to wake up; Part 9
-// adds a message for the wait.
-const api = axios.create({
+// Exported so tests can swap in a network-free adapter. A cold API on
+// Render's free tier can take this long to wake up; Part 9 adds a message
+// for the wait.
+export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30_000,
 })
 
+// Read on each call rather than once at load, so tests can switch modes.
+function isMockMode() {
+  return import.meta.env.VITE_USE_MOCK === 'true'
+}
+
 export async function getTracking(waybill, signal) {
-  if (useMock) {
-    return mockGetTracking(waybill, signal)
+  const url = `/api/tracking/${encodeURIComponent(waybill)}`
+  if (isMockMode()) {
+    return mockGetTracking(waybill, url, signal)
   }
-  const response = await api.get(`/api/tracking/${encodeURIComponent(waybill)}`, { signal })
+  const response = await api.get(url, { signal })
   return response.data
 }
 
 export async function getDemoWaybills(signal) {
-  if (useMock) {
+  if (isMockMode()) {
     await mockDelay(signal)
     return shipments.map((shipment) => shipment.waybill).sort()
   }
@@ -37,17 +43,17 @@ export async function getDemoWaybills(signal) {
   return response.data
 }
 
-async function mockGetTracking(waybill, signal) {
+async function mockGetTracking(waybill, url, signal) {
   await mockDelay(signal)
 
   const normalized = waybill.trim().toUpperCase()
   if (!WAYBILL_PATTERN.test(normalized)) {
-    throw problem(400, 'Invalid waybill format', 'A waybill is WB followed by 8 digits, for example WB10000004.')
+    throw problem(url, 400, 'Invalid waybill format', 'A waybill is WB followed by 8 digits, for example WB10000004.')
   }
 
   const shipment = shipments.find((s) => s.waybill === normalized)
   if (!shipment) {
-    throw problem(404, 'Shipment not found', `No shipment was found for waybill ${normalized}.`)
+    throw problem(url, 404, 'Shipment not found', `No shipment was found for waybill ${normalized}.`)
   }
 
   // The real API sends a fresh object every time, so a caller that changes
@@ -78,18 +84,19 @@ function mockDelay(signal) {
 
 // Builds the error Axios throws for a 4xx response, with the API's
 // ProblemDetails body, so error handling can't tell mock from real.
-function problem(status, title, detail) {
+function problem(url, status, title, detail) {
+  const config = { method: 'get', baseURL: api.defaults.baseURL, url, headers: new AxiosHeaders() }
   const response = {
     status,
     statusText: '',
-    headers: { 'content-type': 'application/problem+json' },
-    config: {},
+    headers: new AxiosHeaders({ 'content-type': 'application/problem+json; charset=utf-8' }),
+    config,
     data: { type: PROBLEM_TYPES[status], title, status, detail },
   }
   return new AxiosError(
     `Request failed with status code ${status}`,
     AxiosError.ERR_BAD_REQUEST,
-    undefined,
+    config,
     undefined,
     response,
   )
