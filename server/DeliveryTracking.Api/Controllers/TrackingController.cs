@@ -20,7 +20,10 @@ public sealed class TrackingController : ControllerBase
     [ProducesResponseType<TrackingResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
-    public async Task<ActionResult<TrackingResponse>> GetTracking(string waybill, CancellationToken ct)
+    // Nullable because model binding turns a whitespace-only value into null.
+    // As a non-nullable string, [ApiController] would reject it with a
+    // generic validation error before the format check could run.
+    public async Task<ActionResult<TrackingResponse>> GetTracking(string? waybill, CancellationToken ct)
     {
         if (!WaybillFormat.IsValid(waybill))
         {

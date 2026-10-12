@@ -8,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// The OpenAPI generator reads these options, not the MVC ones above, so
+// without this it documents statuses as integers.
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
@@ -29,8 +32,11 @@ if (args.Contains("--seed"))
 }
 
 app.UseExceptionHandler();
-// Gives bodiless errors, such as a 404 for an unknown route, a ProblemDetails body.
-app.UseStatusCodePages();
+// Gives bodiless errors, such as a 404 for an unknown route, a ProblemDetails
+// body. Results.Problem writes JSON whatever the Accept header says; the
+// default handler falls back to plain text for a browser's Accept: text/html.
+app.UseStatusCodePages(context =>
+    Results.Problem(statusCode: context.HttpContext.Response.StatusCode).ExecuteAsync(context.HttpContext));
 app.UseCors(ClientCorsPolicy);
 
 // Enabled in every environment so a reviewer can try the deployed API.

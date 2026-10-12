@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using DeliveryTracking.Api.Data;
 using DeliveryTracking.Api.Data.Mongo;
 using DeliveryTracking.Api.Tests.Fakes;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,6 +17,7 @@ namespace DeliveryTracking.Api.Tests.Integration;
 public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
 {
     private const string ProblemJson = "application/problem+json";
+    private const string ClientOrigin = "http://localhost:5173";
 
     private readonly TrackingApiFactory _factory;
     private readonly HttpClient _client;
@@ -33,6 +36,22 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
 
     private static string[] PropertyNames(JsonElement element) =>
         element.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
+
+    // The parent factory disposes derived factories, so the caller needn't.
+    private HttpClient CreateClientWith(IShipmentRepository repository) =>
+        _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IShipmentRepository>();
+            services.AddSingleton(repository);
+        })).CreateClient();
+
+    private static HttpRequestMessage Preflight(string origin, string method = "GET")
+    {
+        var request = new HttpRequestMessage(HttpMethod.Options, "/api/tracking/WB10000004");
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("Access-Control-Request-Method", method);
+        return request;
+    }
 
     [Fact]
     public async Task GetTracking_KnownWaybill_ReturnsContractJson()
@@ -107,10 +126,15 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
         Assert.Equal("No shipment was found for waybill WB99999999.", json.GetProperty("detail").GetString());
     }
 
-    [Fact]
-    public async Task GetTracking_BadlyFormattedWaybill_Returns400ProblemDetails()
+    // %20 and %09 are a space and a tab: model binding turns a whitespace-only
+    // value into null before the action runs.
+    [Theory]
+    [InlineData("hello")]
+    [InlineData("%20")]
+    [InlineData("%09")]
+    public async Task GetTracking_BadlyFormattedWaybill_Returns400ProblemDetails(string waybill)
     {
-        var response = await _client.GetAsync("/api/tracking/hello");
+        var response = await _client.GetAsync($"/api/tracking/{waybill}");
         var json = await ReadJsonAsync(response);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -121,34 +145,63 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
         Assert.Equal("A waybill is WB followed by 8 digits, for example WB10000004.", json.GetProperty("detail").GetString());
     }
 
-    [Fact]
-    public async Task GetTracking_RepositoryThrows_Returns500ProblemDetailsWithoutInternals()
+    [Theory]
+    [InlineData("application/json")]
+    [InlineData("text/html")]
+    public async Task GetTracking_RepositoryThrows_Returns500ProblemDetailsWithoutInternals(string accept)
     {
-        using var failingFactory = _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-        {
-            services.RemoveAll<IShipmentRepository>();
-            services.AddSingleton<IShipmentRepository, ThrowingShipmentRepository>();
-        }));
-        var client = failingFactory.CreateClient();
+        var client = CreateClientWith(new ThrowingShipmentRepository());
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/tracking/WB10000004");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
 
-        var response = await client.GetAsync("/api/tracking/WB10000004");
+        var response = await client.SendAsync(request);
         var body = await response.Content.ReadAsStringAsync();
         var json = JsonDocument.Parse(body).RootElement;
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.Equal(ProblemJson, response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(["status", "title", "traceId", "type"], PropertyNames(json));
         Assert.Equal(500, json.GetProperty("status").GetInt32());
+        Assert.Equal("An error occurred while processing your request.", json.GetProperty("title").GetString());
         Assert.DoesNotContain(ThrowingShipmentRepository.SecretMessage, body);
         Assert.DoesNotContain(nameof(ThrowingShipmentRepository), body);
     }
 
-    [Fact]
-    public async Task GetTracking_UnknownRoute_Returns404ProblemDetails()
+    // A browser opening an API URL sends Accept: text/html; errors must still
+    // be ProblemDetails.
+    [Theory]
+    [InlineData("GET", "/api/nope", "application/json", HttpStatusCode.NotFound)]
+    [InlineData("GET", "/api/nope", "text/html", HttpStatusCode.NotFound)]
+    [InlineData("POST", "/api/tracking/WB10000004", "application/json", HttpStatusCode.MethodNotAllowed)]
+    [InlineData("POST", "/api/tracking/WB10000004", "text/html", HttpStatusCode.MethodNotAllowed)]
+    public async Task UnmatchedRequest_AnyAccept_ReturnsProblemDetails(string method, string path, string accept, HttpStatusCode expectedStatus)
     {
-        var response = await _client.GetAsync("/api/nope");
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var response = await _client.SendAsync(request);
+        var json = await ReadJsonAsync(response);
+
+        Assert.Equal(expectedStatus, response.StatusCode);
         Assert.Equal(ProblemJson, response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal((int)expectedStatus, json.GetProperty("status").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("/api/tracking/WB10000004")]
+    [InlineData("/api/tracking")]
+    public async Task Endpoints_ClientDisconnects_CancelsRepositoryCall(string path)
+    {
+        var repository = new BlockingShipmentRepository();
+        var client = CreateClientWith(repository);
+        using var disconnect = new CancellationTokenSource();
+
+        var request = client.GetAsync(path, disconnect.Token);
+        await repository.Started.WaitAsync(TimeSpan.FromSeconds(5));
+        disconnect.Cancel();
+
+        await repository.Cancelled.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
     }
 
     [Fact]
@@ -172,20 +225,55 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 
-    [Theory]
-    [InlineData("http://localhost:5173", true)]
-    [InlineData("https://evil.example", false)]
-    public async Task Cors_Preflight_AllowsOnlyConfiguredOrigin(string origin, bool expectedAllowed)
+    [Fact]
+    public async Task Cors_PreflightFromConfiguredOrigin_AllowsGetOnly()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Options, "/api/tracking/WB10000004");
-        request.Headers.Add("Origin", origin);
-        request.Headers.Add("Access-Control-Request-Method", "GET");
+        using var request = Preflight(ClientOrigin);
 
         var response = await _client.SendAsync(request);
 
-        var allowed = response.Headers.TryGetValues("Access-Control-Allow-Origin", out var values)
-            && values.Single() == origin;
-        Assert.Equal(expectedAllowed, allowed);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(ClientOrigin, Assert.Single(response.Headers.GetValues("Access-Control-Allow-Origin")));
+        Assert.Equal("GET", Assert.Single(response.Headers.GetValues("Access-Control-Allow-Methods")));
+    }
+
+    // A GET preflight can't tell WithMethods("GET") from AllowAnyMethod(),
+    // because both echo GET; asking for DELETE can. ASP.NET Core still
+    // answers with the policy's methods, and the browser blocks the DELETE
+    // because it isn't in the list.
+    [Fact]
+    public async Task Cors_PreflightForDeleteFromConfiguredOrigin_AdvertisesGetOnly()
+    {
+        using var request = Preflight(ClientOrigin, "DELETE");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal("GET", Assert.Single(response.Headers.GetValues("Access-Control-Allow-Methods")));
+    }
+
+    [Fact]
+    public async Task Cors_PreflightFromUnknownOrigin_GrantsNothing()
+    {
+        using var request = Preflight("https://evil.example");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Methods"));
+    }
+
+    // Production reads only appsettings.json, whose origin list is empty until
+    // Render sets one, so even the development client is refused.
+    [Fact]
+    public async Task Cors_ProductionDefaults_GrantNothing()
+    {
+        var client = _factory.WithWebHostBuilder(builder => builder.UseEnvironment("Production")).CreateClient();
+        using var request = Preflight(ClientOrigin);
+
+        var response = await client.SendAsync(request);
+
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Methods"));
     }
 
     [Fact]
@@ -195,7 +283,14 @@ public class TrackingEndpointTests : IClassFixture<TrackingApiFactory>
         var json = await ReadJsonAsync(response);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(json.GetProperty("paths").TryGetProperty("/api/tracking/{waybill}", out _));
+        var responses = json.GetProperty("paths").GetProperty("/api/tracking/{waybill}")
+            .GetProperty("get").GetProperty("responses");
+        Assert.Equal(["200", "400", "404"], PropertyNames(responses));
+
+        var statusSchema = json.GetProperty("components").GetProperty("schemas").GetProperty("TrackingStatus");
+        Assert.Equal(
+            ["Packed", "Processing", "InTransit", "OutForDelivery", "Delivered", "Exception"],
+            statusSchema.GetProperty("enum").EnumerateArray().Select(v => v.GetString()!).ToArray());
     }
 
     [Fact]
